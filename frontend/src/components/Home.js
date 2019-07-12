@@ -1,35 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Link } from 'react-router-dom';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
 import Typography from '@material-ui/core/Typography';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import { ExpansionPanel, ExpansionPanelSummary, ExpansionPanelDetails } from '@material-ui/core';
 
-const useStyles = makeStyles({
+const useStyles = makeStyles(theme => ({
     card: {
-        margin: '10px 5px',
-        minWidth: 300,
+        marginTop: 10
     },
     title: {
-        fontSize: 20,
+        fontSize: 14,
+        paddingTop: '10px',
+        paddingBottom:'8px'
     },
     body: {
+        fontSize: 16,
+    },
+    heading: {
         fontSize: 18,
-        padding: '8px 8px',
+        fontWeight: theme.typography.fontWeightRegular,
     }
-});
+}));
 
 function Home() {
     const classes = useStyles();
     const [pubs, setPubState] = useState('');
-    const [status, setStatus] = useState('');
-
+    const [expanded, setExpanded] = useState(false);
     const getPubs = async () => {
-        const PubResult = await fetch(`http://localhost:5000`)
+        const PubResult = await fetch(`http://localhost:5000/`)
             .then(res => res.json());
         setPubState(PubResult);
-        setStatus('Showing results in RENCI Database');
     }
 
     useEffect(getPubs, []);
@@ -39,27 +40,32 @@ function Home() {
         pubArray.push(pubs[key]);
     })
 
-    const searchbyType = async (event, type) => {
-        const PubResult = await fetch(`http://localhost:5000/reference/type/${type}`)
-            .then(res => res.json());
-        setPubState(PubResult);
-        setStatus('Filtered by '+type);
-    } 
+    const handleExpandChange = curr_doi => (event, isExpanded) => {
+        setExpanded(isExpanded ? curr_doi : false);
+    };
 
     return (
         <Container>
-            <Typography className={classes.body}><strong>{status}</strong> </Typography>
-            {
-                pubArray.map(pub => <Card className={classes.card}>
-                    <CardContent>
-                        <Typography className={classes.body}><strong>Title: </strong> {pub.Title}</Typography>
-                        <Typography className={classes.body}><strong>DOI: </strong><a href={"https://dx.doi.org/"+pub.DOI}>{pub.DOI}</a></Typography>
-                        <Typography className={classes.body}><strong>Author(s): </strong>{pub.Authors.join(", ")}</Typography>
-                        <Typography className={classes.body}><strong>Created Date: </strong>{pub.Created_Date}</Typography>
-                        <Typography className={classes.body}><strong>Type: </strong> <Link onClick={(e) => {searchbyType(e,pub.Type)}}> {pub.Type}</Link> </Typography>
-                    </CardContent>
-                </Card>)
-            }
+            <Typography className={classes.title}>{pubs.status} </Typography>
+            {pubArray.map(pub =>
+                <ExpansionPanel className={classes.card} expanded={expanded === pub.DOI} onChange={handleExpandChange(pub.DOI)}>
+                    <ExpansionPanelSummary
+                        expandIcon={<ExpandMoreIcon />}
+                        aria-controls="panel1a-content"
+                        id="panel1a-header">
+                        <Container>
+                            <Typography className={classes.heading}><strong>{pub.Title}</strong></Typography>
+                            <Typography block><a href={"https://dx.doi.org/" + pub.DOI}>{pub.DOI}</a></Typography>
+                        </Container>
+                    </ExpansionPanelSummary>
+                    <ExpansionPanelDetails>
+                        <Container>
+                            <Typography className={classes.body}><strong>Author(s): </strong>{pub.Authors.join(", ")}</Typography><hr/>
+                            <Typography className={classes.body}>Published on <strong>{pub.Created_Date}</strong>, Category: <strong>{pub.Type}</strong></Typography>
+                        </Container>
+                    </ExpansionPanelDetails>
+                </ExpansionPanel>
+            )}
         </Container>
     );
 }

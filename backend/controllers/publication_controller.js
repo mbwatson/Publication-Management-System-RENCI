@@ -1,15 +1,84 @@
 const Publication = require('../models/publication/schema');
+const Category = require('../models/category/category')
 const request = require('request');
 
+exports.advancedSearch = function (req, res) {
+    _title = req.params.title;
+    _author = req.params.author;
+    _type = req.params.type;
+    _sdate = req.params.s_date;
+    _edate = req.params.e_date;
+
+    if (_author === undefined) {
+        _author = '';
+    }
+    if (_title === undefined) {
+        _title = '';
+    }
+    if (_sdate === undefined) {
+        _sdate = '1995-12-08';
+    }
+    if (_edate === undefined) {
+        tem_edate = new Date();
+        tem_edate = tem_edate.toISOString();
+        _edate = tem_edate.substring(0, 10);
+    }
+
+    Publication.find()
+        .and([
+            { Title: { $regex: _title, $options: 'i' } },
+            { Authors: { $regex: _author, $options: 'i' } },
+            { $or: generateTypeFinder(_type) },
+            {
+                Created_Date: {
+                    '$gte': _sdate,
+                    '$lte': _edate
+                }
+            }
+        ])
+        .exec(
+            function (err, pubs) {
+                if (err) {
+                    console.log(err);
+                    throw (err);
+                }
+                res.send(pubs);
+            })
+
+    function generateTypeFinder(TypeString) {
+        let TypeFinder = [];
+        for (let i = 0; i < TypeString.length; i++) {
+            switch (TypeString.substring(i, i + 1)) {
+                case 'b':
+                    TypeFinder.push({ Type: 'book-chapter' });
+                    break;
+                case 'j':
+                    TypeFinder.push({ Type: 'journal-article' });
+                    break;
+                case 'p':
+                    TypeFinder.push({ Type: 'proceedings-article' });
+                    break;
+            }
+        }
+        return TypeFinder;
+    }
+}
 
 exports.getAll = function (req, res) {
+    let toSend = [];
     return Publication.find({}, function (err, pubs) {
         if (err) {
             console.log(err);
             throw (err);
         }
-        res.send(pubs);
-    })
+        toSend = pubs;
+    }).count(function (err, counts) {
+        if (err) {
+            console.log(err);
+        }
+        toSend.status = counts;
+        res.send(toSend);
+    });
 }
 
 exports.getOne = function (req, Res) {
@@ -30,10 +99,9 @@ exports.getOne = function (req, Res) {
                     fullnameAuthors.push(parsedAuthors[i]['given'] + " " + parsedAuthors[i]['family']);
                 }
                 let result = {
-                    Title: parsedData['title'], Authors: fullnameAuthors, DOI: parsedData['DOI'], Type: parsedData['type'], Created_Date: parsedData['created']['date-time'].substring(0,10)
+                    Title: parsedData['title'], Authors: fullnameAuthors, DOI: parsedData['DOI'], Type: parsedData['type'], Created_Date: parsedData['created']['date-time'].substring(0, 10)
                 };
                 result['status'] = 'Found 1 matching result from Crossref API';
-                result['save'] = '0';
                 Res.send(result);
             })
         }
@@ -50,28 +118,29 @@ exports.getSave = function (req, Res) {
         for (i = 0; i < parsedAuthors.length; i++) {
             fullnameAuthors.push(parsedAuthors[i]['given'] + " " + parsedAuthors[i]['family']);
         }
+        Category.find({ Category: parsedData['type'] }, function (err, categoryTest) {
+            if (err) {
+                throw err;
+            }
+            if (categoryTest === []) {
+                const categoryResult = new Category({
+                    'Category': parsedData['type']
+                });
+                categoryResult.save(function (err) {
+                    if (err) throw err;
+                })
+            }
+        })
         const saveResult = new Publication({
-            'Title': parsedData['title'], 'Authors': fullnameAuthors, 'DOI': parsedData['DOI'], 'Type': parsedData['type'], Created_Date: parsedData['created']['date-time'].substring(0,10)
+            'Title': parsedData['title'], 'Authors': fullnameAuthors, 'DOI': parsedData['DOI'], 'Type': parsedData['type'], Created_Date: parsedData['created']['date-time'].substring(0, 10)
         });
+
         saveResult.save(function (err) {
             if (err) throw err;
         });
         const renderResult = {
-            'Title': parsedData['title'], 'Authors': fullnameAuthors, 'DOI': parsedData['DOI'], 'Type': parsedData['type'], 'status': "Stored in RENCI Database", 'Created_Date': parsedData['created']['date-time'].substring(0,10)
+            'Title': parsedData['title'], 'Authors': fullnameAuthors, 'DOI': parsedData['DOI'], 'Type': parsedData['type'], 'status': "Stored in RENCI Database", 'Created_Date': parsedData['created']['date-time'].substring(0, 10)
         }
         Res.send(renderResult);
-    });
-}
-
-exports.sortbyType = function (req, res) {
-    const _TYPE = req.params.type;
-    Publication.find({ Type: _TYPE }, function (err, publication) {
-        if (err) {
-            console.log(err);
-            throw err;
-        }
-        else {
-            res.send(publication);
-        }
     });
 }
