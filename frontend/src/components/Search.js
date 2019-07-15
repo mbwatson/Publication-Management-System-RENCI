@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
 import Card from '@material-ui/core/Card';
@@ -41,14 +41,31 @@ function Search() {
   const [status, setStatusState] = useState('');
   const [sdate, setSDate] = useState('2001-01-01');
   const [edate, setEDate] = useState('2019-07-09');
+  const [categories, setCategories] = useState([]);
 
-  const [type, setTypeState] = useState({
-    book: true,
-    journal: true,
-    proceedings: true,
-  });
+  let isLoading = true;
+  let categoryString = "";
 
-  let typeString = "";
+  const fetchCategories = async () => {
+    const categoryResults = await fetch(`http://localhost:5000/category`)
+      .then(res => res.json());
+    setCategories(categoryResults);
+  }
+
+  useEffect(fetchCategories, []);
+
+ let categoryJSON = {};
+  let categoryArray = [];
+  if (isLoading) {
+    categories.forEach(function (category) {
+      let curr_cate = category['Category'];
+      categoryJSON[curr_cate] = false;
+      categoryArray.push(curr_cate);
+    })
+    isLoading = false;
+  }
+
+
 
   const handle_edate_Change = event => {
     setEDate(event.target.value);
@@ -70,24 +87,23 @@ function Search() {
     setAuthorState(event.target.value);
   }
 
-  const handleTypeChange = event => {
+  const handleCategoryChange = event => {
     let TargetName = event.target.value;
-    setTypeState({ ...type, [TargetName]: event.target.checked });
-    type[TargetName] = event.target.checked;
-    console.log(type);
+    // setcategoryJSON({...categoryJSON, [TargetName] : event.target.checked});
+    categoryJSON[TargetName] = event.target.checked;
+    console.log(categoryJSON);
   }
 
-  function typetoString() {
-    for (let atype in type) {
-      if (type[atype] === true) {
-        typeString = typeString + atype.substr(0, 1);
+  function categorytoString() {
+    for (let category in categoryJSON) {
+      if (categoryJSON[category] === true) {
+        categoryString = categoryString + category.substr(0, 1);
       }
     }
   }
 
   const handleSubmit = event => {
     if (ref !== '') {
-      console.log('visited');
       fetch(`http://localhost:5000/reference/${ref}`)
         .then(res => res.json())
         .then(data => {
@@ -97,9 +113,9 @@ function Search() {
     else {
       setStatusState('Searching by ' + title + " " + author);
       event.preventDefault();
-      typetoString();
-      console.log(`http://localhost:5000/search/title=${title}&&author=${author}&&type=${typeString}&&s_date=${sdate}&&e_date=${edate}`);
-      fetch(`http://localhost:5000/search/title=${title}&&author=${author}&&type=${typeString}&&s_date=${sdate}&&e_date=${edate}`)
+      categorytoString();
+      console.log(`http://localhost:5000/search/title=${title}&&author=${author}&&type=${categoryString}&&s_date=${sdate}&&e_date=${edate}`);
+      fetch(`http://localhost:5000/search/title=${title}&&author=${author}&&type=${categoryString}&&s_date=${sdate}&&e_date=${edate}`)
         .then(res => res.json())
         .then(data => {
           setpubArrayState(data);
@@ -115,9 +131,9 @@ function Search() {
         <FormControl className={classes.input}>
           <FormLabel><strong>Type</strong></FormLabel>
           <FormGroup>
-            <FormControlLabel control={<Checkbox checked={type.book} onChange={handleTypeChange} value="book" />} label="Book Chapter"></FormControlLabel>
-            <FormControlLabel control={<Checkbox checked={type.journal} onChange={handleTypeChange} value="journal" />} label="Journal Article" ></FormControlLabel>
-            <FormControlLabel control={<Checkbox checked={type.proceedings} onChange={handleTypeChange} value="proceedings" />} label="Proceedings Article"></FormControlLabel>
+            {categoryArray.map(cate => <FormControlLabel control={<Checkbox checked={categoryJSON.cate} onChange={handleCategoryChange} value={cate} />} label={cate} ></FormControlLabel>)}
+            {/* <FormControlLabel control={<Checkbox checked={.journal} onChange={handleTypeChange} value="journal" />} label="Journal Article" ></FormControlLabel>
+            <FormControlLabel control={<Checkbox checked={type.proceedings} onChange={handleTypeChange} value="proceedings" />} label="Proceedings Article"></FormControlLabel> */}
           </FormGroup>
         </FormControl>
         <FormControl>
